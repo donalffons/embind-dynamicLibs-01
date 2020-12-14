@@ -1932,7 +1932,7 @@ var ASM_CONSTS = {
       return sym;
     }
   Module["resolveGlobalSymbol"] = resolveGlobalSymbol;
-  function loadSideModule(binary, flags) {
+  function loadWebAssemblyModule(binary, flags) {
       var int32View = new Uint32Array(new Uint8Array(binary.subarray(0, 24)).buffer);
       assert(int32View[0] == 0x6d736100, 'need to see wasm magic number'); // \0asm
       // we should see the dylink section right after the magic number and wasm version
@@ -2127,7 +2127,7 @@ var ASM_CONSTS = {
       });
       return loadModule();
     }
-  Module["loadSideModule"] = loadSideModule;
+  Module["loadWebAssemblyModule"] = loadWebAssemblyModule;
   
   function fetchBinary(url) {
       return fetch(url, { credentials: 'same-origin' }).then(function(response) {
@@ -2194,7 +2194,7 @@ var ASM_CONSTS = {
         if (flags.fs) {
           var libData = flags.fs.readFile(libFile, {encoding: 'binary'});
           if (!(libData instanceof Uint8Array)) {
-            libData = new Uint8Array(lib_data);
+            libData = new Uint8Array(libData);
           }
           return flags.loadAsync ? Promise.resolve(libData) : libData;
         }
@@ -2218,11 +2218,11 @@ var ASM_CONSTS = {
         // module not preloaded - load lib data and create new module from it
         if (flags.loadAsync) {
           return loadLibData(lib).then(function(libData) {
-            return loadSideModule(libData, flags);
+            return loadWebAssemblyModule(libData, flags);
           });
         }
   
-        return loadSideModule(loadLibData(lib), flags);
+        return loadWebAssemblyModule(loadLibData(lib), flags);
       }
   
       // Module.symbols <- libModule.symbols (flags.global handler)
@@ -5763,7 +5763,7 @@ var ASM_CONSTS = {
   try {
   
       var pathname = SYSCALLS.getStr(path);
-      var mode = SYSCALLS.get();
+      var mode = varargs ? SYSCALLS.get() : 0;
       var stream = FS.open(pathname, flags, mode);
       return stream.fd;
     } catch (e) {
@@ -6964,16 +6964,22 @@ var ASM_CONSTS = {
     }
   Module["__read_sockaddr"] = __read_sockaddr;
   
-  function __write_sockaddr(sa, family, addr, port) {
+  function __write_sockaddr(sa, family, addr, port, addrlen) {
       switch (family) {
         case 2:
           addr = __inet_pton4_raw(addr);
+          if (addrlen) {
+            HEAP32[((addrlen)>>2)]=16;
+          }
           HEAP16[((sa)>>1)]=family;
           HEAP32[(((sa)+(4))>>2)]=addr;
           HEAP16[(((sa)+(2))>>1)]=_htons(port);
           break;
         case 10:
           addr = __inet_pton6_raw(addr);
+          if (addrlen) {
+            HEAP32[((addrlen)>>2)]=28;
+          }
           HEAP32[((sa)>>2)]=family;
           HEAP32[(((sa)+(8))>>2)]=addr[0];
           HEAP32[(((sa)+(12))>>2)]=addr[1];
@@ -6984,10 +6990,9 @@ var ASM_CONSTS = {
           HEAP32[(((sa)+(24))>>2)]=0;
           break;
         default:
-          return { errno: 5 };
+          return 5;
       }
-      // kind of lame, but let's match _read_sockaddr's interface
-      return {};
+      return 0;
     }
   Module["__write_sockaddr"] = __write_sockaddr;
   function ___sys_socketcall(call, socketvararg) {try {
@@ -7036,16 +7041,16 @@ var ASM_CONSTS = {
           var sock = getSocketFromFD(), addr = SYSCALLS.get(), addrlen = SYSCALLS.get();
           var newsock = sock.sock_ops.accept(sock);
           if (addr) {
-            var res = __write_sockaddr(addr, newsock.family, DNS.lookup_name(newsock.daddr), newsock.dport);
-            assert(!res.errno);
+            var errno = __write_sockaddr(addr, newsock.family, DNS.lookup_name(newsock.daddr), newsock.dport, addrlen);
+            assert(!errno);
           }
           return newsock.stream.fd;
         }
         case 6: { // getsockname
           var sock = getSocketFromFD(), addr = SYSCALLS.get(), addrlen = SYSCALLS.get();
           // TODO: sock.saddr should never be undefined, see TODO in websocket_sock_ops.getname
-          var res = __write_sockaddr(addr, sock.family, DNS.lookup_name(sock.saddr || '0.0.0.0'), sock.sport);
-          assert(!res.errno);
+          var errno = __write_sockaddr(addr, sock.family, DNS.lookup_name(sock.saddr || '0.0.0.0'), sock.sport, addrlen);
+          assert(!errno);
           return 0;
         }
         case 7: { // getpeername
@@ -7053,8 +7058,8 @@ var ASM_CONSTS = {
           if (!sock.daddr) {
             return -53; // The socket is not connected.
           }
-          var res = __write_sockaddr(addr, sock.family, DNS.lookup_name(sock.daddr), sock.dport);
-          assert(!res.errno);
+          var errno = __write_sockaddr(addr, sock.family, DNS.lookup_name(sock.daddr), sock.dport, addrlen);
+          assert(!errno);
           return 0;
         }
         case 11: { // sendto
@@ -7072,8 +7077,8 @@ var ASM_CONSTS = {
           var msg = sock.sock_ops.recvmsg(sock, len);
           if (!msg) return 0; // socket is closed
           if (addr) {
-            var res = __write_sockaddr(addr, sock.family, DNS.lookup_name(msg.addr), msg.port);
-            assert(!res.errno);
+            var errno = __write_sockaddr(addr, sock.family, DNS.lookup_name(msg.addr), msg.port, addrlen);
+            assert(!errno);
           }
           HEAPU8.set(msg.buffer, buf);
           return msg.buffer.byteLength;
@@ -7150,8 +7155,8 @@ var ASM_CONSTS = {
           // write the source address out
           var name = HEAP32[((message)>>2)];
           if (name) {
-            var res = __write_sockaddr(name, sock.family, DNS.lookup_name(msg.addr), msg.port);
-            assert(!res.errno);
+            var errno = __write_sockaddr(name, sock.family, DNS.lookup_name(msg.addr), msg.port);
+            assert(!errno);
           }
           // write the buffer out to the scatter-gather arrays
           var bytesRead = 0;
@@ -9800,7 +9805,7 @@ var ASM_CONSTS = {
   
       function allocaddrinfo(family, type, proto, canon, addr, port) {
         var sa, salen, ai;
-        var res;
+        var errno;
   
         salen = family === 10 ?
           28 :
@@ -9809,8 +9814,8 @@ var ASM_CONSTS = {
           __inet_ntop6_raw(addr) :
           __inet_ntop4_raw(addr);
         sa = _malloc(salen);
-        res = __write_sockaddr(sa, family, addr, port);
-        assert(!res.errno);
+        errno = __write_sockaddr(sa, family, addr, port);
+        assert(!errno);
   
         ai = _malloc(32);
         HEAP32[(((ai)+(4))>>2)]=family;
@@ -14531,12 +14536,12 @@ var ASM_CONSTS = {
           return !Module.noWasmDecoding && name.endsWith('.so');
         };
         wasmPlugin['handle'] = function(byteArray, name, onload, onerror) {
-          // loadSideModule can not load modules out-of-order, so rather
+          // loadWebAssemblyModule can not load modules out-of-order, so rather
           // than just running the promises in parallel, this makes a chain of
           // promises to run in series.
           this['asyncWasmLoadPromise'] = this['asyncWasmLoadPromise'].then(
             function() {
-              return loadSideModule(byteArray, {loadAsync: true, nodelete: true});
+              return loadWebAssemblyModule(byteArray, {loadAsync: true, nodelete: true});
             }).then(
               function(module) {
                 Module['preloadedWasm'][name] = module;
@@ -29170,7 +29175,7 @@ var ASM_CONSTS = {
                   buttonsCount: gamepad.buttons.length,
                   axesCount: gamepad.axes.length,
                   buttons: allocate(new Array(gamepad.buttons.length), ALLOC_NORMAL),
-                  axes: allocate(new Array(gamepad.axes.length*4), 'float', ALLOC_NORMAL)
+                  axes: allocate(new Array(gamepad.axes.length*4), ALLOC_NORMAL)
                 };
   
                 if (GLFW.joystickFunc) {
@@ -29463,18 +29468,23 @@ var ASM_CONSTS = {
         for (i = 0; i < GLFW.windows.length && GLFW.windows[i] == null; i++) {
           // no-op
         }
+        var useWebGL = GLFW.hints[0x00022001] > 0; // Use WebGL when we are told to based on GLFW_CLIENT_API
         if (i == GLFW.windows.length) {
-          var contextAttributes = {
-            antialias: (GLFW.hints[0x0002100D] > 1), // GLFW_SAMPLES
-            depth: (GLFW.hints[0x00021005] > 0),     // GLFW_DEPTH_BITS
-            stencil: (GLFW.hints[0x00021006] > 0),   // GLFW_STENCIL_BITS
-            alpha: (GLFW.hints[0x00021004] > 0)      // GLFW_ALPHA_BITS
+          if (useWebGL) {
+            var contextAttributes = {
+              antialias: (GLFW.hints[0x0002100D] > 1), // GLFW_SAMPLES
+              depth: (GLFW.hints[0x00021005] > 0),     // GLFW_DEPTH_BITS
+              stencil: (GLFW.hints[0x00021006] > 0),   // GLFW_STENCIL_BITS
+              alpha: (GLFW.hints[0x00021004] > 0)      // GLFW_ALPHA_BITS
+            }
+            Module.ctx = Browser.createContext(Module['canvas'], true, true, contextAttributes);
+          } else {
+            Browser.init();
           }
-          Module.ctx = Browser.createContext(Module['canvas'], true, true, contextAttributes);
         }
   
         // If context creation failed, do not return a valid window
-        if (!Module.ctx) return 0;
+        if (!Module.ctx && useWebGL) return 0;
   
         // Get non alive id
         var win = new GLFW_Window(id, width, height, title, monitor, share);
@@ -32779,9 +32789,6 @@ var asmLibraryArg = {
 var asm = createWasm();
 /** @type {function(...*):?} */
 var ___wasm_call_ctors = Module["___wasm_call_ctors"] = createExportWrapper("__wasm_call_ctors");
-
-/** @type {function(...*):?} */
-var ___wasm_apply_relocs = Module["___wasm_apply_relocs"] = createExportWrapper("__wasm_apply_relocs");
 
 /** @type {function(...*):?} */
 var __ZN33EmscriptenBindingInitializer_mainC1Ev = Module["__ZN33EmscriptenBindingInitializer_mainC1Ev"] = createExportWrapper("_ZN33EmscriptenBindingInitializer_mainC1Ev");
@@ -50394,6 +50401,12 @@ var _getsockopt = Module["_getsockopt"] = createExportWrapper("getsockopt");
 var _freeaddrinfo = Module["_freeaddrinfo"] = createExportWrapper("freeaddrinfo");
 
 /** @type {function(...*):?} */
+var ___wasm_apply_data_relocs = Module["___wasm_apply_data_relocs"] = createExportWrapper("__wasm_apply_data_relocs");
+
+/** @type {function(...*):?} */
+var ___wasm_apply_global_relocs = Module["___wasm_apply_global_relocs"] = createExportWrapper("__wasm_apply_global_relocs");
+
+/** @type {function(...*):?} */
 var ___set_stack_limits = Module["___set_stack_limits"] = createExportWrapper("__set_stack_limits");
 
 /** @type {function(...*):?} */
@@ -52433,7 +52446,7 @@ if (!Object.getOwnPropertyDescriptor(Module, "LDSO")) Module["LDSO"] = function(
 if (!Object.getOwnPropertyDescriptor(Module, "createInvokeFunction")) Module["createInvokeFunction"] = function() { abort("'createInvokeFunction' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "getMemory")) Module["getMemory"] = function() { abort("'getMemory' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "fetchBinary")) Module["fetchBinary"] = function() { abort("'fetchBinary' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "loadSideModule")) Module["loadSideModule"] = function() { abort("'loadSideModule' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
+if (!Object.getOwnPropertyDescriptor(Module, "loadWebAssemblyModule")) Module["loadWebAssemblyModule"] = function() { abort("'loadWebAssemblyModule' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "loadDynamicLibrary")) Module["loadDynamicLibrary"] = function() { abort("'loadDynamicLibrary' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "preloadDylibs")) Module["preloadDylibs"] = function() { abort("'preloadDylibs' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "uncaughtExceptionCount")) Module["uncaughtExceptionCount"] = function() { abort("'uncaughtExceptionCount' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
