@@ -6,13 +6,14 @@
       import main from '/emscripten/build/main.js';
       window.setImmediate = () => {}
       (async () => {
-        await main({
+        const o = await main({
           locateFile: f => "/emscripten/build/main.wasm",
           dynamicLibraries: [
             "/emscripten/build/library.wasm"
           ]
         });
-        console.log("done");
+        console.log("done loading");
+        o.test();
       })()
     </script>
   </body>
