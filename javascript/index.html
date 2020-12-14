@@ -1,0 +1,19 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <script type="module">
+      import main from '/emscripten/build/main.js';
+      window.setImmediate = () => {}
+      (async () => {
+        await main({
+          locateFile: f => "/emscripten/build/main.wasm",
+          dynamicLibraries: [
+            "/emscripten/build/library.wasm"
+          ]
+        });
+        console.log("done");
+      })()
+    </script>
+  </body>
+</html>
