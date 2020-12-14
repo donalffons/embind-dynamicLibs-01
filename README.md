@@ -6,27 +6,26 @@ Visit: `http://localhost:5000/javascript/`
 
 Problem:
 
-ASSERTIONS=2 yields
+Current build configuration yields:
+
 ```
-Uncaught (in promise) RuntimeError: abort(stack overflow) at Error
-    at jsStackTrace (http://localhost:5000/emscripten/build/main.js:1806:19)
-    at stackTrace (http://localhost:5000/emscripten/build/main.js:2328:16)
-    at abort (http://localhost:5000/emscripten/build/main.js:1547:44)
-    at ___handle_stack_overflow (http://localhost:5000/emscripten/build/main.js:2560:7)
-    at _ZN36EmscriptenBindingInitializer_libraryC1Ev (<anonymous>:wasm-function[6]:0x564)
-    at <anonymous>:wasm-function[5]:0x53b
-    at <anonymous>:wasm-function[13]:0x777
-    at __post_instantiate (<anonymous>:wasm-function[3]:0x516)
-    at callRuntimeCallbacks (http://localhost:5000/emscripten/build/main.js:1771:11)
-    at initRuntime (http://localhost:5000/emscripten/build/main.js:1385:3)
-    at abort (http://localhost:5000/emscripten/build/main.js:1553:11)
-    at ___handle_stack_overflow (http://localhost:5000/emscripten/build/main.js:2560:7)
-    at _ZN36EmscriptenBindingInitializer_libraryC1Ev (<anonymous>:wasm-function[6]:0x564)
-    at <anonymous>:wasm-function[5]:0x53b
-    at <anonymous>:wasm-function[13]:0x777
-    at __post_instantiate (<anonymous>:wasm-function[3]:0x516)
-    at callRuntimeCallbacks (http://localhost:5000/emscripten/build/main.js:1771:11)
-    at initRuntime (http://localhost:5000/emscripten/build/main.js:1385:3)
-    at doRun (http://localhost:5000/emscripten/build/main.js:52684:5)
-    at run (http://localhost:5000/emscripten/build/main.js:52706:5)
+Uncaught (in promise) RuntimeError: abort(Assertion failed: function in Table but not functionsInTableMap) at Error
+    at jsStackTrace (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1806:19)
+    at stackTrace (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:2328:16)
+    at abort (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1547:44)
+    at assert (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:717:5)
+    at addFunctionWasm (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:571:5)
+    at updateGOT (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1871:34)
+    at relocateExports (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1896:7)
+    at postInstantiation (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:2089:27)
+    at https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:2108:20
+    at async Promise.all (index 0)
+    at abort (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1553:11)
+    at assert (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:717:5)
+    at addFunctionWasm (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:571:5)
+    at updateGOT (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1871:34)
+    at relocateExports (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:1896:7)
+    at postInstantiation (https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:2089:27)
+    at https://embind-dynamic-libs-01.vercel.app/emscripten/build/main.js:2108:20
+    at async Promise.all (index 0)
 ```
